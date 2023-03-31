@@ -8,5 +8,5 @@ setup(
                       'numpy',
                       'matplotlib',
                       'torch'],
-    include_package_data=True,
+    package_data={'simple_driving': ['resources/*.urdf']}
 )
