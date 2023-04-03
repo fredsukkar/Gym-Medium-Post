@@ -195,4 +195,4 @@ class SimpleDrivingEnv(gym.Env):
         return self._envStepCounter > 1500
 
     def close(self):
-        self._p.disconnect(self._p)
+        self._p.disconnect()
