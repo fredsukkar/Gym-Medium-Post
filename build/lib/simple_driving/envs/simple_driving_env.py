@@ -2,6 +2,7 @@ import gym
 import numpy as np
 import math
 import pybullet as p
+from pybullet_utils import bullet_client as bc
 from simple_driving.resources.car import Car
 from simple_driving.resources.plane import Plane
 from simple_driving.resources.goal import Goal
@@ -26,12 +27,10 @@ class SimpleDrivingEnv(gym.Env):
             high=np.array([40, 40, 1, 1, 5, 5, 10, 10], dtype=np.float32))
         self.np_random, _ = gym.utils.seeding.np_random()
 
-
         if renders:
-            self.client = p.connect(p.GUI)
+          self._p = bc.BulletClient(connection_mode=p.GUI)
         else:
-            self.client = p.connect(p.DIRECT)
-        # Reduce length of episodes for RL algorithms
+          self._p = bc.BulletClient()
 
         self.reached_goal = False
         self._timeStep = 0.01
@@ -58,12 +57,12 @@ class SimpleDrivingEnv(gym.Env):
             action = [throttle, steering_angle]
         self.car.apply_action(action)
         for i in range(self._actionRepeat):
-          p.stepSimulation()
+          self._p.stepSimulation()
           if self._renders:
             time.sleep(self._timeStep)
 
-          carpos, carorn = p.getBasePositionAndOrientation(self.car.car)
-          ballpos, ballorn = p.getBasePositionAndOrientation(self.goal_object.goal)
+          carpos, carorn = self._p.getBasePositionAndOrientation(self.car.car)
+          ballpos, ballorn = self._p.getBasePositionAndOrientation(self.goal_object.goal)
           car_ob = self.getExtendedObservation()
 
           if self._termination():
@@ -99,12 +98,12 @@ class SimpleDrivingEnv(gym.Env):
         return [seed]
 
     def reset(self):
-        p.resetSimulation(self.client)
-        p.setTimeStep(self._timeStep, self.client)
-        p.setGravity(0, 0, -10)
+        self._p.resetSimulation()
+        self._p.setTimeStep(self._timeStep)
+        self._p.setGravity(0, 0, -10)
         # Reload the plane and car
-        Plane(self.client)
-        self.car = Car(self.client)
+        Plane(self._p)
+        self.car = Car(self._p)
         self._envStepCounter = 0
 
         # Set the goal to a random target
@@ -117,7 +116,7 @@ class SimpleDrivingEnv(gym.Env):
         self.reached_goal = False
 
         # Visual element of the goal
-        self.goal_object = Goal(self.client, self.goal)
+        self.goal_object = Goal(self._p, self.goal)
 
         # Get observation to return
         carpos = self.car.get_observation()
@@ -130,23 +129,23 @@ class SimpleDrivingEnv(gym.Env):
     def render(self, mode='human'):
         if mode == "fp_camera":
             # Base information
-            car_id, client_id = self.car.get_ids()
-            proj_matrix = p.computeProjectionMatrixFOV(fov=80, aspect=1,
+            car_id = self.car.get_ids()
+            proj_matrix = self._p.computeProjectionMatrixFOV(fov=80, aspect=1,
                                                        nearVal=0.01, farVal=100)
             pos, ori = [list(l) for l in
-                        p.getBasePositionAndOrientation(car_id, client_id)]
+                        self._p.getBasePositionAndOrientation(car_id)]
             pos[2] = 0.2
 
             # Rotate camera direction
-            rot_mat = np.array(p.getMatrixFromQuaternion(ori)).reshape(3, 3)
+            rot_mat = np.array(self._p.getMatrixFromQuaternion(ori)).reshape(3, 3)
             camera_vec = np.matmul(rot_mat, [1, 0, 0])
             up_vec = np.matmul(rot_mat, np.array([0, 0, 1]))
-            view_matrix = p.computeViewMatrix(pos, pos + camera_vec, up_vec)
+            view_matrix = self._p.computeViewMatrix(pos, pos + camera_vec, up_vec)
 
             # Display image
-            # frame = p.getCameraImage(100, 100, view_matrix, proj_matrix)[2]
+            # frame = self._p.getCameraImage(100, 100, view_matrix, proj_matrix)[2]
             # frame = np.reshape(frame, (100, 100, 4))
-            (_, _, px, _, _) = p.getCameraImage(width=RENDER_WIDTH,
+            (_, _, px, _, _) = self._p.getCameraImage(width=RENDER_WIDTH,
                                                       height=RENDER_HEIGHT,
                                                       viewMatrix=view_matrix,
                                                       projectionMatrix=proj_matrix,
@@ -159,19 +158,19 @@ class SimpleDrivingEnv(gym.Env):
             # plt.pause(.00001)
 
         elif mode == "tp_camera":
-            car_id, client_id = self.car.get_ids()
-            base_pos, orn = p.getBasePositionAndOrientation(car_id, client_id)
-            view_matrix = p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition=base_pos,
+            car_id = self.car.get_ids()
+            base_pos, orn = self._p.getBasePositionAndOrientation(car_id)
+            view_matrix = self._p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition=base_pos,
                                                                     distance=20.0,
                                                                     yaw=40.0,
                                                                     pitch=-35,
                                                                     roll=0,
                                                                     upAxisIndex=2)
-            proj_matrix = p.computeProjectionMatrixFOV(fov=60,
+            proj_matrix = self._p.computeProjectionMatrixFOV(fov=60,
                                                              aspect=float(RENDER_WIDTH) / RENDER_HEIGHT,
                                                              nearVal=0.1,
                                                              farVal=100.0)
-            (_, _, px, _, _) = p.getCameraImage(width=RENDER_WIDTH,
+            (_, _, px, _, _) = self._p.getCameraImage(width=RENDER_WIDTH,
                                                       height=RENDER_HEIGHT,
                                                       viewMatrix=view_matrix,
                                                       projectionMatrix=proj_matrix,
@@ -184,10 +183,10 @@ class SimpleDrivingEnv(gym.Env):
 
     def getExtendedObservation(self):
         # self._observation = []  #self._racecar.getObservation()
-        carpos, carorn = p.getBasePositionAndOrientation(self.car.car)
-        ballpos, ballorn = p.getBasePositionAndOrientation(self.goal_object.goal)
-        invCarPos, invCarOrn = p.invertTransform(carpos, carorn)
-        ballPosInCar, ballOrnInCar = p.multiplyTransforms(invCarPos, invCarOrn, ballpos, ballorn)
+        carpos, carorn = self._p.getBasePositionAndOrientation(self.car.car)
+        ballpos, ballorn = self._p.getBasePositionAndOrientation(self.goal_object.goal)
+        invCarPos, invCarOrn = self._p.invertTransform(carpos, carorn)
+        ballPosInCar, ballOrnInCar = self._p.multiplyTransforms(invCarPos, invCarOrn, ballpos, ballorn)
 
         observation = [ballPosInCar[0], ballPosInCar[1]]
         return observation
@@ -196,4 +195,4 @@ class SimpleDrivingEnv(gym.Env):
         return self._envStepCounter > 1500
 
     def close(self):
-        p.disconnect(self.client)
+        self._p.disconnect(self._p)

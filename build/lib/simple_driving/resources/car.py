@@ -7,9 +7,8 @@ class Car:
     def __init__(self, client):
         self.client = client
         f_name = os.path.join(os.path.dirname(__file__), 'simplecar.urdf')
-        self.car = p.loadURDF(fileName=f_name,
-                              basePosition=[0, 0, 0.1],
-                              physicsClientId=client)
+        self.car = self.client.loadURDF(fileName=f_name,
+                              basePosition=[0, 0, 0.1])
 
         # Joint indices as found by p.getJointInfo()
         self.steering_joints = [0, 2]
@@ -23,7 +22,7 @@ class Car:
         self.c_throttle = 150
 
     def get_ids(self):
-        return self.car, self.client
+        return self.car
 
     def apply_action(self, action):
         # Expects action to be two dimensional
@@ -34,10 +33,9 @@ class Car:
         steering_angle = max(min(steering_angle, 0.6), -0.6)
 
         # Set the steering joint positions
-        p.setJointMotorControlArray(self.car, self.steering_joints,
+        self.client.setJointMotorControlArray(self.car, self.steering_joints,
                                     controlMode=p.POSITION_CONTROL,
-                                    targetPositions=[steering_angle] * 2,
-                                    physicsClientId=self.client)
+                                    targetPositions=[steering_angle] * 2)
 
         # Calculate drag / mechanical resistance ourselves
         # Using velocity control, as torque control requires precise models
@@ -50,22 +48,21 @@ class Car:
             # self.joint_speed = 0
 
         # Set the velocity of the wheel joints directly
-        p.setJointMotorControlArray(
+        self.client.setJointMotorControlArray(
             bodyUniqueId=self.car,
             jointIndices=self.drive_joints,
             controlMode=p.VELOCITY_CONTROL,
             targetVelocities=[self.joint_speed] * 4,
-            forces=[1.2] * 4,
-            physicsClientId=self.client)
+            forces=[1.2] * 4)
 
     def get_observation(self):
         # Get the position and orientation of the car in the simulation
-        pos, ang = p.getBasePositionAndOrientation(self.car, self.client)
+        pos, ang = self.client.getBasePositionAndOrientation(self.car)
         ang = p.getEulerFromQuaternion(ang)
         ori = (math.cos(ang[2]), math.sin(ang[2]))
         pos = pos[:2]
         # Get the velocity of the car
-        vel = p.getBaseVelocity(self.car, self.client)[0][0:2]
+        vel = self.client.getBaseVelocity(self.car)[0][0:2]
 
         # Concatenate position, orientation, velocity
         observation = (pos + ori + vel)

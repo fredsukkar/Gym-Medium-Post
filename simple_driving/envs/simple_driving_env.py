@@ -28,7 +28,7 @@ class SimpleDrivingEnv(gym.Env):
         self.np_random, _ = gym.utils.seeding.np_random()
 
         if renders:
-          self._p = bc.BulletClient(connection_mode=pybullet.GUI)
+          self._p = bc.BulletClient(connection_mode=p.GUI)
         else:
           self._p = bc.BulletClient()
 
@@ -98,12 +98,12 @@ class SimpleDrivingEnv(gym.Env):
         return [seed]
 
     def reset(self):
-        self._p.resetSimulation(self.client)
-        self._p.setTimeStep(self._timeStep, self.client)
+        self._p.resetSimulation()
+        self._p.setTimeStep(self._timeStep)
         self._p.setGravity(0, 0, -10)
         # Reload the plane and car
-        Plane(self.client)
-        self.car = Car(self.client)
+        Plane(self._p)
+        self.car = Car(self._p)
         self._envStepCounter = 0
 
         # Set the goal to a random target
@@ -116,7 +116,7 @@ class SimpleDrivingEnv(gym.Env):
         self.reached_goal = False
 
         # Visual element of the goal
-        self.goal_object = Goal(self.client, self.goal)
+        self.goal_object = Goal(self._p, self.goal)
 
         # Get observation to return
         carpos = self.car.get_observation()
@@ -129,11 +129,11 @@ class SimpleDrivingEnv(gym.Env):
     def render(self, mode='human'):
         if mode == "fp_camera":
             # Base information
-            car_id, client_id = self.car.get_ids()
+            car_id = self.car.get_ids()
             proj_matrix = self._p.computeProjectionMatrixFOV(fov=80, aspect=1,
                                                        nearVal=0.01, farVal=100)
             pos, ori = [list(l) for l in
-                        self._p.getBasePositionAndOrientation(car_id, client_id)]
+                        self._p.getBasePositionAndOrientation(car_id)]
             pos[2] = 0.2
 
             # Rotate camera direction
@@ -158,8 +158,8 @@ class SimpleDrivingEnv(gym.Env):
             # plt.pause(.00001)
 
         elif mode == "tp_camera":
-            car_id, client_id = self.car.get_ids()
-            base_pos, orn = self._p.getBasePositionAndOrientation(car_id, client_id)
+            car_id = self.car.get_ids()
+            base_pos, orn = self._p.getBasePositionAndOrientation(car_id)
             view_matrix = self._p.computeViewMatrixFromYawPitchRoll(cameraTargetPosition=base_pos,
                                                                     distance=20.0,
                                                                     yaw=40.0,
@@ -195,4 +195,4 @@ class SimpleDrivingEnv(gym.Env):
         return self._envStepCounter > 1500
 
     def close(self):
-        self._p.disconnect(self.client)
+        self._p.disconnect(self._p)
