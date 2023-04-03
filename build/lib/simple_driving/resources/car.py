@@ -19,7 +19,7 @@ class Car:
         self.c_rolling = 0.2
         self.c_drag = 0.01
         # Throttle constant increases "speed" of the car
-        self.c_throttle = 150
+        self.c_throttle = 100
 
     def get_ids(self):
         return self.car
@@ -30,7 +30,7 @@ class Car:
 
         # Clip throttle and steering angle to reasonable values
         throttle = min(max(throttle, -1), 1)
-        steering_angle = max(min(steering_angle, 0.6), -0.6)
+        steering_angle = max(min(steering_angle, 0.4), -0.4)
 
         # Set the steering joint positions
         self.client.setJointMotorControlArray(self.car, self.steering_joints,
@@ -43,7 +43,7 @@ class Car:
                                         self.c_rolling)
         acceleration = self.c_throttle * throttle + friction
         # Each time step is 1/240 of a second
-        self.joint_speed = self.joint_speed + 0.01 * acceleration
+        self.joint_speed = min(self.joint_speed + 0.01 * acceleration, 10.0)
         # if self.joint_speed < 0:
             # self.joint_speed = 0
 

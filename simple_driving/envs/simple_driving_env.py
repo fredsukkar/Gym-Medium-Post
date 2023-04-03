@@ -84,11 +84,11 @@ class SimpleDrivingEnv(gym.Env):
         #         carpos[1] >= 10 or carpos[1] <= -10):
         #     self.done = True
         # Done by reaching goal
-        # elif dist_to_goal < 0.5 and not self.reached_goal:
-        #     print("reached goal")
-        #     # self.done = True
-        #     self.reached_goal = True
-        #     reward = 50
+        if dist_to_goal < 0.5 and not self.reached_goal:
+            print("reached goal")
+            self.done = True
+            self.reached_goal = True
+            reward = 50
 
         ob = car_ob
         return ob, reward, self.done, dict()
@@ -192,7 +192,7 @@ class SimpleDrivingEnv(gym.Env):
         return observation
 
     def _termination(self):
-        return self._envStepCounter > 1500
+        return self._envStepCounter > 2000
 
     def close(self):
         self._p.disconnect()
